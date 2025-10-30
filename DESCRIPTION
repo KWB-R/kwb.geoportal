@@ -14,5 +14,13 @@ BugReports: https://github.com/KWB-R/kwb.geoportal/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+Imports:
+    purrr,
+    tibble,
+    xml2
 Suggests: 
-    covr
+    covr,
+    DT,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

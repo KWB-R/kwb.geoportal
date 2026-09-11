@@ -9,6 +9,7 @@
 #'
 #' @return Either `x` (when present) or `y` (when `x` is missing).
 #'
+#' @name op-null-default
 #' @keywords internal
 #' @export
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x

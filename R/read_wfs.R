@@ -12,6 +12,9 @@
 #'   `"https://gdi.berlin.de/services/wfs"`).
 #'
 #' @return character of length one, the service URL without query string.
+#'   Signals an error when `service` is not a single path element, because the
+#'   resulting URL would otherwise be handed to `xml2::read_xml()`, which parses
+#'   any string containing `<` or `>` as literal XML rather than fetching it.
 #' @export
 #' @examples
 #' wfs_base_url("atkis")
@@ -20,6 +23,18 @@ wfs_base_url <- function(
     host = "https://gdi.berlin.de/services/wfs"
 ) {
   stopifnot(is.character(service), length(service) == 1L, nzchar(service))
+
+  if (grepl("[[:space:]<>?#/]", service)) {
+    stop(sprintf(
+      paste0(
+        "'%s' is not a WFS service name. Expected the last path element of an ",
+        "endpoint URL, such as \"atkis\", or a full https:// URL. ",
+        "Use find_wfs() to look one up."
+      ),
+      service
+    ), call. = FALSE)
+  }
+
   paste0(sub("/+$", "", host), "/", service)
 }
 

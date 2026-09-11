@@ -40,7 +40,9 @@ wfs_service_name <- function(url) {
 #'   `base_url`.
 #'
 #' @return tibble with columns `title`, `service`, `link_url`, `link_desc`,
-#'   `link_protocol`, `geonet_uuid`, sorted by title.
+#'   `link_protocol`, `geonet_uuid`, sorted by title. Warns, and returns no
+#'   rows, when `metadata` holds no links at all, which is a different thing
+#'   from `pattern` not matching.
 #' @export
 #' @importFrom purrr map_dfr
 #' @importFrom tibble tibble as_tibble
@@ -82,6 +84,21 @@ find_wfs <- function(
   })
 
   if (nrow(flat) == 0L) {
+    return(empty_wfs_result())
+  }
+
+  # Without this, a catalogue whose records carry no online resources at all is
+  # indistinguishable from a pattern that simply does not match: both come back
+  # as a zero-row tibble.
+  if (!any(!is.na(flat$link_url) & nzchar(flat$link_url))) {
+    warning(sprintf(
+      paste0(
+        "None of the %d catalogue records carries a link, so there is nothing ",
+        "to search. The response of the 'base_url' passed to ",
+        "read_metadata_all() contains no <link> elements."
+      ),
+      nrow(metadata)
+    ), call. = FALSE)
     return(empty_wfs_result())
   }
 

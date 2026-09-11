@@ -16,6 +16,9 @@ the feature types offered by that service.}
 }
 \value{
 character of length one, the service URL without query string.
+Signals an error when \code{service} is not a single path element, because the
+resulting URL would otherwise be handed to \code{xml2::read_xml()}, which parses
+any string containing \code{<} or \code{>} as literal XML rather than fetching it.
 }
 \description{
 The Berlin spatial data infrastructure publishes one WFS endpoint per

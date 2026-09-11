@@ -11,6 +11,22 @@ test_that("wfs_base_url() composes the endpoint", {
   expect_error(wfs_base_url(""))
 })
 
+test_that("wfs_base_url() rejects what cannot be a service name", {
+  # xml2::read_xml() parses any string containing "<" or ">" as literal XML
+  # instead of fetching it, so a placeholder that reaches read_xml() fails with
+  # "Start tag expected" rather than with anything the caller can act on.
+  expect_error(wfs_base_url("<gefundener dienst>"), "not a WFS service name")
+  expect_error(list_wfs_layers("<gefundener dienst>"), "not a WFS service name")
+  expect_error(wfs_base_url("atkis wsg"), "not a WFS service name")
+  expect_error(wfs_base_url("services/wfs/atkis"), "not a WFS service name")
+
+  # A full URL stays a valid way to name the endpoint.
+  expect_equal(
+    wfs_base_url("atkis"),
+    "https://gdi.berlin.de/services/wfs/atkis"
+  )
+})
+
 test_that("compose_ogc_url() reproduces the URLs that the Berlin services answer", {
   # Both strings are taken verbatim from data-raw/kwb25_dashboard_fetch_rivers.R
   # and data-raw/kwb25_dashboard_fetch_wsg.R of kwb.BerlinWaterModel, where they
@@ -126,4 +142,31 @@ test_that("find_wfs() filters by protocol and pattern without network", {
     find_wfs("gibtesnicht", metadata = metadata),
     c("title", "service", "link_url", "link_desc", "link_protocol", "geonet_uuid")
   )
+
+  # A pattern that does not match is not a problem worth warning about.
+  expect_silent(find_wfs("gibtesnicht", metadata = metadata))
+})
+
+test_that("find_wfs() distinguishes 'no links' from 'pattern did not match'", {
+  # What the GDI Berlin service catalogue actually returns: records whose
+  # <link> elements are absent, so every search comes back empty.
+  linkless <- tibble::tibble(
+    geonet_uuid = c("uuid-1", "uuid-2"),
+    title = c("Kanalisation 2012", "ALKIS Flurstuecke"),
+    abstract = c("Kanalnetz Berlin", "Liegenschaftskataster"),
+    links = list(parse_gn_link(""), parse_gn_link(""))
+  )
+
+  expect_warning(
+    result <- find_wfs("kanalisation", metadata = linkless),
+    "carries a link"
+  )
+  expect_equal(nrow(result), 0L)
+  expect_named(
+    result,
+    c("title", "service", "link_url", "link_desc", "link_protocol", "geonet_uuid")
+  )
+
+  # The warning does not depend on the pattern: there is nothing to search.
+  expect_warning(find_wfs(metadata = linkless), "carries a link")
 })

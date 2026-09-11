@@ -43,7 +43,7 @@ exceed the server's response limit. WFS 2.0.0 only.}
 
 \item{host}{see \code{\link[=wfs_base_url]{wfs_base_url()}}.}
 
-\item{quiet}{suppress the progress messages of \code{\link[sf:st_read]{sf::read_sf()}} and of this
+\item{quiet}{suppress the progress messages of \code{\link[sf:read_sf]{sf::read_sf()}} and of this
 function (default: \code{FALSE}).}
 }
 \value{

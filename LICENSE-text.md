@@ -1,0 +1,4 @@
+# License
+
+    YEAR: 2025
+    COPYRIGHT HOLDER: Kompetenzzentrum Wasser Berlin gGmbH (KWB)

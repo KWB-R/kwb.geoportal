@@ -221,3 +221,69 @@ test_that("describe_protocols() summarises counts, commonest first", {
     "a (1), b (1) and 1 more"
   )
 })
+
+test_that("parse_gn_link() finds the protocol whatever the field offset is", {
+  # Verbatim from the GDI Berlin catalogue: URL at position 3.
+  atom <- parse_gn_link(paste0(
+    "|Downloaddienst - 3D-Gebaeudemodelle (ATOM)",
+    "|https://gdi.berlin.de/data/a_lod1/atom/|INSPIRE ATOM|INSPIRE ATOM|1"
+  ))
+  expect_equal(atom$link_url, "https://gdi.berlin.de/data/a_lod1/atom/")
+  expect_equal(atom$link_protocol, "INSPIRE ATOM")
+  expect_equal(atom$link_desc, "Downloaddienst - 3D-Gebaeudemodelle (ATOM)")
+
+  # Same catalogue, two extra leading fields, so the URL sits at position 5.
+  # Reading position 4 blindly returned the DESCRIPTION as the protocol, which
+  # is what made find_wfs() come back empty for every pattern.
+  shifted <- parse_gn_link(paste0(
+    "|ALKIS Berlin|",
+    "|Darstellungsdienst - ALKIS Berlin Flurstuecke (WMS)",
+    "|https://gdi.berlin.de/services/wms/alkis_flurstuecke|OGC:WMS|image/png|1"
+  ))
+  expect_equal(
+    shifted$link_url,
+    "https://gdi.berlin.de/services/wms/alkis_flurstuecke"
+  )
+  expect_equal(shifted$link_protocol, "OGC:WMS")
+  expect_equal(
+    shifted$link_desc,
+    "Darstellungsdienst - ALKIS Berlin Flurstuecke (WMS)"
+  )
+  expect_equal(shifted$link_mime, "image/png")
+  expect_equal(shifted$link_order, "1")
+
+  # A WFS link is what find_wfs() is after, at either offset.
+  for (link in c(
+    "|Downloaddienst (WFS)|https://gdi.berlin.de/services/wfs/atkis|OGC:WFS|||",
+    "|a|b|Downloaddienst (WFS)|https://gdi.berlin.de/services/wfs/atkis|OGC:WFS||"
+  )) {
+    parsed <- parse_gn_link(link)
+    expect_equal(parsed$link_protocol, "OGC:WFS")
+    expect_equal(parsed$link_url, "https://gdi.berlin.de/services/wfs/atkis")
+  }
+
+  # Nothing that looks like a URL: every field is missing, not empty.
+  for (link in c("", "|", "|Downloaddienst (WFS)||OGC:WFS|||")) {
+    parsed <- parse_gn_link(link)
+    expect_true(is.na(parsed$link_url))
+    expect_true(is.na(parsed$link_protocol))
+  }
+})
+
+test_that("find_wfs() finds a WFS link that the old offset hid", {
+  metadata <- tibble::tibble(
+    geonet_uuid = "uuid-1",
+    title = "Kanalisation 2012",
+    abstract = "Kanalnetz Berlin",
+    links = list(parse_gn_link(paste0(
+      "|Kanal|",
+      "|Downloaddienst - Kanalisation (WFS)",
+      "|https://gdi.berlin.de/services/wfs/kanal|OGC:WFS|text/xml|1"
+    )))
+  )
+
+  hit <- find_wfs("kanalisation", metadata = metadata)
+  expect_equal(nrow(hit), 1L)
+  expect_equal(hit$service, "kanal")
+  expect_equal(hit$link_protocol, "OGC:WFS")
+})

@@ -105,8 +105,9 @@ find_wfs <- function(
 
   # The links exist but none of them uses `protocol`: naming the protocols that
   # are actually on offer answers the question, where a zero-row tibble only
-  # repeats it. The Berlin catalogue, for one, publishes its INSPIRE download
-  # services as "INSPIRE ATOM" rather than as "OGC:WFS".
+  # repeats it.
+  flat$link_protocol <- gn_link_protocol(flat$link_url, flat$link_protocol)
+
   if (!is.null(protocol)) {
     keep <- !is.na(flat$link_protocol) &
       grepl(protocol, flat$link_protocol, fixed = TRUE)
@@ -197,4 +198,55 @@ describe_protocols <- function(x, max_shown = 10L) {
   }
 
   described
+}
+
+#' Protocol of a link, taken from its URL where the catalogue is unusable
+#'
+#' A GeoNetwork link declares its protocol in its own field, but the GDI Berlin
+#' records do not fill it in: their WMS and WFS links repeat the description
+#' there, so `link_protocol` reads
+#' `"Darstellungsdienst - ALKIS Berlin (WMS)"` where `"OGC:WMS"` is meant, and
+#' their viewer links leave it empty. Filtering on the declared value therefore
+#' drops every OGC service in the catalogue.
+#'
+#' The endpoint URL carries the same information and is machine-readable: the
+#' Berlin services answer under `/services/<type>/<name>` and name the type
+#' again in a `service=` query parameter. Where the URL says what the service
+#' is, it wins; otherwise the declared protocol is kept as it is, so a
+#' catalogue that fills the field in properly is unaffected.
+#'
+#' @param url link URL, `NA` allowed.
+#' @param protocol declared protocol, used where the URL says nothing.
+#'
+#' @return character vector, as long as `url`.
+#' @keywords internal
+#' @examples
+#' kwb.geoportal:::gn_link_protocol(
+#'   "https://gdi.berlin.de/services/wfs/kanal?service=WFS",
+#'   "Downloaddienst - Kanalisation (WFS)"
+#' )
+gn_link_protocol <- function(url, protocol = NA_character_) {
+  url <- as.character(url)
+  protocol <- rep_len(as.character(protocol), length(url))
+
+  known <- c(
+    WFS = "OGC:WFS",
+    WMS = "OGC:WMS",
+    WMTS = "OGC:WMTS",
+    WCS = "OGC:WCS",
+    CSW = "OGC:CSW"
+  )
+
+  derived <- rep(NA_character_, length(url))
+
+  # WMTS before WMS: the shorter name is a prefix of the longer one.
+  for (type in names(known)[order(nchar(names(known)), decreasing = TRUE)]) {
+    says_so <- !is.na(url) & is.na(derived) & (
+      grepl(paste0("[?&]service=", type, "([&#]|$)"), url, ignore.case = TRUE) |
+        grepl(paste0("/services/", type, "/"), url, ignore.case = TRUE)
+    )
+    derived[says_so] <- known[[type]]
+  }
+
+  ifelse(is.na(derived), protocol, derived)
 }

@@ -21,16 +21,14 @@
 #' `|Darstellungsdienst (WMS)|https://...|OGC:WMS|||`.
 #' This helper splits such a string into named columns.
 #'
-#' The fields are ordered name, description, URL, protocol, MIME type, order,
-#' but the number of leading fields is **not** constant within one catalogue:
-#' in the GDI Berlin service catalogue the URL sits at position 3 of the
-#' INSPIRE ATOM records and at position 5 of the others. Reading the protocol
-#' from a fixed position therefore yields the description for most records --
-#' `"Darstellungsdienst - ALKIS Berlin (WMS)"` instead of `"OGC:WMS"` -- which
-#' silently defeats any filter on it.
-#'
+#' The fields are ordered name, description, URL, protocol, MIME type, order.
 #' The URL is the one field that can be recognised on its own, so it is located
-#' first and the remaining fields are read relative to it.
+#' first and the remaining fields are read relative to it; that keeps the
+#' columns aligned for a catalogue that pads the record differently.
+#'
+#' Note that a parsed `link_protocol` is only as good as the catalogue: the GDI
+#' Berlin records repeat the description there instead of naming a protocol,
+#' so filtering on it needs [gn_link_protocol()].
 #'
 #' @param x Character string as found inside a `<link>` XML node.
 #'

@@ -222,68 +222,101 @@ test_that("describe_protocols() summarises counts, commonest first", {
   )
 })
 
-test_that("parse_gn_link() finds the protocol whatever the field offset is", {
-  # Verbatim from the GDI Berlin catalogue: URL at position 3.
-  atom <- parse_gn_link(paste0(
-    "|Downloaddienst - 3D-Gebaeudemodelle (ATOM)",
+# Verbatim from https://gdi.berlin.de/geonetwork/srv/ger/q?facet.q=type/service
+# &resultType=details&sortBy=changeDate&fast=index&from=1&to=5 -- umlauts are
+# written as \u escapes to keep this file ASCII.
+GDI_LINKS <- c(
+  atom = paste0(
+    "|Downloaddienst - 3D-Geb\u00e4udemodelle im Level of Detail 1 (LoD 1) (ATOM)",
     "|https://gdi.berlin.de/data/a_lod1/atom/|INSPIRE ATOM|INSPIRE ATOM|1"
-  ))
-  expect_equal(atom$link_url, "https://gdi.berlin.de/data/a_lod1/atom/")
-  expect_equal(atom$link_protocol, "INSPIRE ATOM")
-  expect_equal(atom$link_desc, "Downloaddienst - 3D-Gebaeudemodelle (ATOM)")
-
-  # Same catalogue, two extra leading fields, so the URL sits at position 5.
-  # Reading position 4 blindly returned the DESCRIPTION as the protocol, which
-  # is what made find_wfs() come back empty for every pattern.
-  shifted <- parse_gn_link(paste0(
-    "|ALKIS Berlin|",
-    "|Darstellungsdienst - ALKIS Berlin Flurstuecke (WMS)",
-    "|https://gdi.berlin.de/services/wms/alkis_flurstuecke|OGC:WMS|image/png|1"
-  ))
-  expect_equal(
-    shifted$link_url,
-    "https://gdi.berlin.de/services/wms/alkis_flurstuecke"
+  ),
+  wms = paste0(
+    "|Darstellungsdienst - Fahrradabstellanlagen (seit 2021) (WMS)",
+    "|https://gdi.berlin.de/services/wms/fahrradabstellanlagen",
+    "?request=GetCapabilities&service=WMS",
+    "|Darstellungsdienst - Fahrradabstellanlagen (seit 2021) (WMS)",
+    "|Darstellungsdienst - Fahrradabstellanlagen (seit 2021) (WMS)|1"
+  ),
+  view = paste0(
+    "|Darstellung der Karte im Geoportal Berlin",
+    "|https://gdi.berlin.de/view/fahrradabstellanlagen||text/plain|2"
+  ),
+  wfs = paste0(
+    "|Downloaddienst - Fahrradabstellanlagen (seit 2021) (WFS)",
+    "|https://gdi.berlin.de/services/wfs/fahrradabstellanlagen",
+    "?request=GetCapabilities&service=WFS",
+    "|Downloaddienst - Fahrradabstellanlagen (seit 2021) (WFS)",
+    "|Downloaddienst - Fahrradabstellanlagen (seit 2021) (WFS)|1"
   )
-  expect_equal(shifted$link_protocol, "OGC:WMS")
+)
+
+test_that("parse_gn_link() reads the real GDI Berlin records", {
+  parsed <- purrr::map_dfr(GDI_LINKS, parse_gn_link)
+
   expect_equal(
-    shifted$link_desc,
-    "Darstellungsdienst - ALKIS Berlin Flurstuecke (WMS)"
+    parsed$link_url,
+    c(
+      "https://gdi.berlin.de/data/a_lod1/atom/",
+      paste0("https://gdi.berlin.de/services/wms/fahrradabstellanlagen",
+             "?request=GetCapabilities&service=WMS"),
+      "https://gdi.berlin.de/view/fahrradabstellanlagen",
+      paste0("https://gdi.berlin.de/services/wfs/fahrradabstellanlagen",
+             "?request=GetCapabilities&service=WFS")
+    )
   )
-  expect_equal(shifted$link_mime, "image/png")
-  expect_equal(shifted$link_order, "1")
 
-  # A WFS link is what find_wfs() is after, at either offset.
-  for (link in c(
-    "|Downloaddienst (WFS)|https://gdi.berlin.de/services/wfs/atkis|OGC:WFS|||",
-    "|a|b|Downloaddienst (WFS)|https://gdi.berlin.de/services/wfs/atkis|OGC:WFS||"
-  )) {
-    parsed <- parse_gn_link(link)
-    expect_equal(parsed$link_protocol, "OGC:WFS")
-    expect_equal(parsed$link_url, "https://gdi.berlin.de/services/wfs/atkis")
-  }
+  # The catalogue declares a protocol only for the ATOM link. The WMS and WFS
+  # records repeat their description there, the viewer link leaves it empty.
+  expect_equal(parsed$link_protocol[1], "INSPIRE ATOM")
+  expect_match(parsed$link_protocol[2], "^Darstellungsdienst")
+  expect_true(is.na(parsed$link_protocol[3]))
+  expect_match(parsed$link_protocol[4], "^Downloaddienst")
 
-  # Nothing that looks like a URL: every field is missing, not empty.
-  for (link in c("", "|", "|Downloaddienst (WFS)||OGC:WFS|||")) {
-    parsed <- parse_gn_link(link)
-    expect_true(is.na(parsed$link_url))
-    expect_true(is.na(parsed$link_protocol))
-  }
+  expect_equal(parsed$link_order, c("1", "1", "2", "1"))
 })
 
-test_that("find_wfs() finds a WFS link that the old offset hid", {
+test_that("gn_link_protocol() takes the protocol from the URL", {
+  parsed <- purrr::map_dfr(GDI_LINKS, parse_gn_link)
+  effective <- gn_link_protocol(parsed$link_url, parsed$link_protocol)
+
+  expect_equal(effective[1], "INSPIRE ATOM")   # declared, and usable
+  expect_equal(effective[2], "OGC:WMS")        # repaired from the URL
+  expect_true(is.na(effective[3]))             # a viewer page, not a service
+  expect_equal(effective[4], "OGC:WFS")        # repaired from the URL
+
+  # A catalogue that fills the field in properly is left alone.
+  expect_equal(
+    gn_link_protocol("https://example.org/anything", "OGC:WFS"),
+    "OGC:WFS"
+  )
+  # Either spelling is enough on its own.
+  expect_equal(gn_link_protocol("https://x/services/wfs/y", NA), "OGC:WFS")
+  expect_equal(gn_link_protocol("https://x/y?service=wfs", NA), "OGC:WFS")
+  # WMTS must not be read as WMS.
+  expect_equal(gn_link_protocol("https://x/y?service=WMTS", NA), "OGC:WMTS")
+  expect_true(is.na(gn_link_protocol(NA_character_, NA_character_)))
+})
+
+test_that("find_wfs() finds the WFS the declared protocol hid", {
   metadata <- tibble::tibble(
     geonet_uuid = "uuid-1",
-    title = "Kanalisation 2012",
-    abstract = "Kanalnetz Berlin",
-    links = list(parse_gn_link(paste0(
-      "|Kanal|",
-      "|Downloaddienst - Kanalisation (WFS)",
-      "|https://gdi.berlin.de/services/wfs/kanal|OGC:WFS|text/xml|1"
-    )))
+    title = "Fahrradabstellanlagen (seit 2021)",
+    abstract = "Bestand und Planungen von Fahrradabstellanlagen",
+    links = list(purrr::map_dfr(GDI_LINKS, parse_gn_link))
   )
 
-  hit <- find_wfs("kanalisation", metadata = metadata)
+  hit <- find_wfs("fahrradabstellanlagen", metadata = metadata)
   expect_equal(nrow(hit), 1L)
-  expect_equal(hit$service, "kanal")
+  expect_equal(hit$service, "fahrradabstellanlagen")
   expect_equal(hit$link_protocol, "OGC:WFS")
+
+  # read_wfs() takes that service name as its first argument.
+  expect_equal(
+    wfs_base_url(hit$service),
+    "https://gdi.berlin.de/services/wfs/fahrradabstellanlagen"
+  )
+
+  wms <- find_wfs(metadata = metadata, protocol = "OGC:WMS")
+  expect_equal(nrow(wms), 1L)
+  expect_equal(wms$service, "fahrradabstellanlagen")
 })

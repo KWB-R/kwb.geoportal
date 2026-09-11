@@ -170,3 +170,54 @@ test_that("find_wfs() distinguishes 'no links' from 'pattern did not match'", {
   # The warning does not depend on the pattern: there is nothing to search.
   expect_warning(find_wfs(metadata = linkless), "carries a link")
 })
+
+test_that("find_wfs() names the protocols on offer when none matches", {
+  # Verbatim from the GDI Berlin catalogue: its INSPIRE download services are
+  # published as "INSPIRE ATOM", so the "OGC:WFS" default matches nothing.
+  metadata <- tibble::tibble(
+    geonet_uuid = c("uuid-1", "uuid-2"),
+    title = c("3D-Gebaeudemodelle", "Fahrradabstellanlagen"),
+    abstract = c("LoD1", "Bestand und Planungen"),
+    links = list(
+      parse_gn_link(paste0(
+        "|Downloaddienst - 3D-Gebaeudemodelle (ATOM)",
+        "|https://gdi.berlin.de/data/a_lod1/atom/|INSPIRE ATOM|INSPIRE ATOM|1"
+      )),
+      parse_gn_link(
+        "|Darstellungsdienst (WMS)|https://gdi.berlin.de/services/wms/rad|OGC:WMS|||"
+      )
+    )
+  )
+
+  expect_warning(
+    result <- find_wfs("gebaeude", metadata = metadata),
+    "No link uses the protocol 'OGC:WFS'"
+  )
+  expect_equal(nrow(result), 0L)
+
+  # The message has to say what IS there, otherwise it is no better than the
+  # empty tibble it replaces.
+  expect_warning(find_wfs(metadata = metadata), "INSPIRE ATOM \\(1\\)")
+  expect_warning(find_wfs(metadata = metadata), "OGC:WMS \\(1\\)")
+
+  # Asking for a protocol that is there still works, and warns about nothing.
+  expect_silent(atom <- find_wfs(metadata = metadata, protocol = "INSPIRE ATOM"))
+  expect_equal(nrow(atom), 1L)
+  expect_equal(atom$link_url, "https://gdi.berlin.de/data/a_lod1/atom/")
+
+  # protocol = NULL keeps every link.
+  expect_silent(all_links <- find_wfs(metadata = metadata, protocol = NULL))
+  expect_equal(nrow(all_links), 2L)
+})
+
+test_that("describe_protocols() summarises counts, commonest first", {
+  expect_equal(
+    describe_protocols(c("OGC:WMS", "INSPIRE ATOM", "OGC:WMS")),
+    "OGC:WMS (2), INSPIRE ATOM (1)"
+  )
+  expect_equal(describe_protocols(c(NA_character_, "")), "no protocol at all")
+  expect_equal(
+    describe_protocols(c("a", "b", "c"), max_shown = 2L),
+    "a (1), b (1) and 1 more"
+  )
+})

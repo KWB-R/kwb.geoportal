@@ -41,8 +41,9 @@ wfs_service_name <- function(url) {
 #'
 #' @return tibble with columns `title`, `service`, `link_url`, `link_desc`,
 #'   `link_protocol`, `geonet_uuid`, sorted by title. Warns, and returns no
-#'   rows, when `metadata` holds no links at all, which is a different thing
-#'   from `pattern` not matching.
+#'   rows, when `metadata` holds no links at all or none of them uses
+#'   `protocol` -- both of which are a different thing from `pattern` not
+#'   matching. The second warning names the protocols that are on offer.
 #' @export
 #' @importFrom purrr map_dfr
 #' @importFrom tibble tibble as_tibble
@@ -102,9 +103,23 @@ find_wfs <- function(
     return(empty_wfs_result())
   }
 
+  # The links exist but none of them uses `protocol`: naming the protocols that
+  # are actually on offer answers the question, where a zero-row tibble only
+  # repeats it. The Berlin catalogue, for one, publishes its INSPIRE download
+  # services as "INSPIRE ATOM" rather than as "OGC:WFS".
   if (!is.null(protocol)) {
     keep <- !is.na(flat$link_protocol) &
       grepl(protocol, flat$link_protocol, fixed = TRUE)
+
+    if (!any(keep)) {
+      warning(sprintf(
+        "No link uses the protocol '%s'. The catalogue offers: %s. Pass one of these as 'protocol', or NULL for all of them.",
+        protocol,
+        describe_protocols(flat$link_protocol)
+      ), call. = FALSE)
+      return(empty_wfs_result())
+    }
+
     flat <- flat[keep, , drop = FALSE]
   }
 
@@ -150,4 +165,36 @@ empty_wfs_result <- function() {
     link_protocol = character(0),
     geonet_uuid   = character(0)
   )
+}
+
+
+#' Summarise the link protocols present in a catalogue
+#'
+#' @param x character vector of `link_protocol` values, `NA`s allowed.
+#' @param max_shown number of protocols to name before summarising the rest.
+#'
+#' @return character of length one, e.g. `"INSPIRE ATOM (826), OGC:WMS (776)"`.
+#' @keywords internal
+describe_protocols <- function(x, max_shown = 10L) {
+  x <- x[!is.na(x) & nzchar(x)]
+
+  if (length(x) == 0L) {
+    return("no protocol at all")
+  }
+
+  counts <- sort(table(x), decreasing = TRUE)
+  shown <- counts[seq_len(min(length(counts), max_shown))]
+
+  described <- paste0(
+    names(shown), " (", as.integer(shown), ")",
+    collapse = ", "
+  )
+
+  if (length(counts) > length(shown)) {
+    described <- paste0(
+      described, " and ", length(counts) - length(shown), " more"
+    )
+  }
+
+  described
 }

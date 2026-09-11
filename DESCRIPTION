@@ -17,6 +17,7 @@ Imports:
     dplyr,
     purrr,
     sf,
+    stringr,
     tibble,
     xml2
 Suggests: 

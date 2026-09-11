@@ -8,9 +8,12 @@
 <url><loc>https://kwb-r.github.io/kwb.geoportal/LICENSE.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/news/index.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/compose_ogc_url.html</loc></url>
+<url><loc>https://kwb-r.github.io/kwb.geoportal/reference/describe_protocols.html</loc></url>
+<url><loc>https://kwb-r.github.io/kwb.geoportal/reference/empty_gn_link.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/empty_wfs_result.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/encode_query_value.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/find_wfs.html</loc></url>
+<url><loc>https://kwb-r.github.io/kwb.geoportal/reference/gn_link_protocol.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/index.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/list_wfs_layers.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/op-null-default.html</loc></url>
@@ -20,6 +23,7 @@
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/read_wfs.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/read_wfs_sf_auto.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/wfs_base_url.html</loc></url>
+<url><loc>https://kwb-r.github.io/kwb.geoportal/reference/wfs_endpoint.html</loc></url>
 <url><loc>https://kwb-r.github.io/kwb.geoportal/reference/wfs_service_name.html</loc></url>
 </urlset>
 

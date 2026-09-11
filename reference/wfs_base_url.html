@@ -72,7 +72,10 @@ the feature types offered by that service.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>character of length one, the service URL without query string.</p>
+    <p>character of length one, the service URL without query string.
+Signals an error when <code>service</code> is not a single path element, because the
+resulting URL would otherwise be handed to <code><a href="http://xml2.r-lib.org/reference/read_xml.html" class="external-link">xml2::read_xml()</a></code>, which parses
+any string containing <code>&lt;</code> or <code>&gt;</code> as literal XML rather than fetching it.</p>
     </div>
 
     <div class="section level2">

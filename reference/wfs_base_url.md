@@ -26,7 +26,12 @@ wfs_base_url(service, host = "https://gdi.berlin.de/services/wfs")
 
 ## Value
 
-character of length one, the service URL without query string.
+character of length one, the service URL without query string. Signals
+an error when `service` is not a single path element, because the
+resulting URL would otherwise be handed to
+[`xml2::read_xml()`](http://xml2.r-lib.org/reference/read_xml.md), which
+parses any string containing `<` or `>` as literal XML rather than
+fetching it.
 
 ## Examples
 

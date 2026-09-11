@@ -84,7 +84,10 @@ to search repeatedly without downloading the catalogue again. If <code>NULL</cod
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>tibble with columns <code>title</code>, <code>service</code>, <code>link_url</code>, <code>link_desc</code>,
-<code>link_protocol</code>, <code>geonet_uuid</code>, sorted by title.</p>
+<code>link_protocol</code>, <code>geonet_uuid</code>, sorted by title. Warns, and returns no
+rows, when <code>metadata</code> holds no links at all or none of them uses
+<code>protocol</code> – both of which are a different thing from <code>pattern</code> not
+matching. The second warning names the protocols that are on offer.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

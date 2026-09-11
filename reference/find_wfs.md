@@ -42,7 +42,10 @@ find_wfs(pattern = NULL, metadata = NULL, protocol = "OGC:WFS", ...)
 ## Value
 
 tibble with columns `title`, `service`, `link_url`, `link_desc`,
-`link_protocol`, `geonet_uuid`, sorted by title.
+`link_protocol`, `geonet_uuid`, sorted by title. Warns, and returns no
+rows, when `metadata` holds no links at all or none of them uses
+`protocol` – both of which are a different thing from `pattern` not
+matching. The second warning names the protocols that are on offer.
 
 ## Details
 

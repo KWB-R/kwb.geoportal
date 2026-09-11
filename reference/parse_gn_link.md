@@ -1,9 +1,8 @@
 # Parse a single GeoNetwork link element
 
-GeoNetwork often encodes links as a single string separated by `|`,
-e.g.: `|Darstellungsdienst (WMS)|https://...|OGC:WMS|||`. This helper
-splits such a string into named columns and pads missing parts up to 6
-elements.
+GeoNetwork encodes links as a single string separated by `|`, e.g.:
+`|Darstellungsdienst (WMS)|https://...|OGC:WMS|||`. This helper splits
+such a string into named columns.
 
 ## Usage
 
@@ -35,23 +34,16 @@ A one-row tibble with columns:
 
 ## Details
 
-The order used here is:
+The fields are ordered name, description, URL, protocol, MIME type,
+order. The URL is the one field that can be recognised on its own, so it
+is located first and the remaining fields are read relative to it; that
+keeps the columns aligned for a catalogue that pads the record
+differently.
 
-1.  link name
-
-2.  link description
-
-3.  link URL
-
-4.  link protocol (e.g. `"OGC:WMS"`)
-
-5.  MIME type
-
-6.  order
-
-Note: In many Berlin GDI records the **first** field (link name) is
-empty, and the actual meaningful text is in the **second** field
-(description).
+Note that a parsed `link_protocol` is only as good as the catalogue: the
+GDI Berlin records repeat the description there instead of naming a
+protocol, so filtering on it needs
+[`gn_link_protocol()`](https://kwb-r.github.io/kwb.geoportal/reference/gn_link_protocol.md).
 
 ## Examples
 
@@ -60,5 +52,5 @@ parse_gn_link("|Darstellungsdienst (WMS)|https://example.org/wms?|OGC:WMS|||")
 #> # A tibble: 1 × 6
 #>   link_name link_desc                link_url link_protocol link_mime link_order
 #>   <chr>     <chr>                    <chr>    <chr>         <chr>     <chr>     
-#> 1 ""        Darstellungsdienst (WMS) https:/… OGC:WMS       ""        ""        
+#> 1 NA        Darstellungsdienst (WMS) https:/… OGC:WMS       NA        NA        
 ```

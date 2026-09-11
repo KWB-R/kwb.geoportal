@@ -320,3 +320,36 @@ test_that("find_wfs() finds the WFS the declared protocol hid", {
   expect_equal(nrow(wms), 1L)
   expect_equal(wms$service, "fahrradabstellanlagen")
 })
+
+test_that("wfs_endpoint() drops the catalogue's own query string", {
+  # This is exactly what find_wfs() reports in its link_url column.
+  reported <- paste0(
+    "https://gdi.berlin.de/services/wfs/ua_kanalisation_2012",
+    "?request=GetCapabilities&service=WFS"
+  )
+  expect_equal(
+    wfs_endpoint(reported),
+    "https://gdi.berlin.de/services/wfs/ua_kanalisation_2012"
+  )
+
+  # A request built from it has one query string, not two, and the namespace
+  # prefix comes from the path.
+  url <- compose_ogc_url(
+    wfs_endpoint(reported),
+    SERVICE = "WFS", VERSION = "2.0.0", REQUEST = "GetFeature",
+    TYPENAMES = "ua_kanalisation_2012:ua_kanalisation_2012"
+  )
+  expect_equal(lengths(regmatches(url, gregexpr("?", url, fixed = TRUE))), 1L)
+  expect_equal(sub("^.*/", "", wfs_endpoint(reported)), "ua_kanalisation_2012")
+
+  # A bare name and a clean URL still work, and a trailing slash is dropped.
+  expect_equal(
+    wfs_endpoint("ua_kanalisation_2012"),
+    "https://gdi.berlin.de/services/wfs/ua_kanalisation_2012"
+  )
+  expect_equal(
+    wfs_endpoint("https://example.org/wfs/x/"),
+    "https://example.org/wfs/x"
+  )
+  expect_error(wfs_endpoint("<gefundener dienst>"), "not a WFS service name")
+})

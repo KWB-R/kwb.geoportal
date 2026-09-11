@@ -12,6 +12,9 @@
 #'   `"https://gdi.berlin.de/services/wfs"`).
 #'
 #' @return character of length one, the service URL without query string.
+#'   Signals an error when `service` is not a single path element, because the
+#'   resulting URL would otherwise be handed to `xml2::read_xml()`, which parses
+#'   any string containing `<` or `>` as literal XML rather than fetching it.
 #' @export
 #' @examples
 #' wfs_base_url("atkis")
@@ -20,7 +23,40 @@ wfs_base_url <- function(
     host = "https://gdi.berlin.de/services/wfs"
 ) {
   stopifnot(is.character(service), length(service) == 1L, nzchar(service))
+
+  if (grepl("[[:space:]<>?#/]", service)) {
+    stop(sprintf(
+      paste0(
+        "'%s' is not a WFS service name. Expected the last path element of an ",
+        "endpoint URL, such as \"atkis\", or a full https:// URL. ",
+        "Use find_wfs() to look one up."
+      ),
+      service
+    ), call. = FALSE)
+  }
+
   paste0(sub("/+$", "", host), "/", service)
+}
+
+#' Endpoint URL of a service given either way of naming it
+#'
+#' [read_wfs()] and [list_wfs_layers()] accept either a service name or a full
+#' endpoint URL. The URL that [find_wfs()] reports carries the catalogue's own
+#' query string -- `?request=GetCapabilities&service=WFS` -- which has to go
+#' before a new query string is appended, or the request ends up with two `?`
+#' and the namespace prefix is read from the query rather than from the path.
+#'
+#' @param service service name or endpoint URL.
+#' @param host see [wfs_base_url()].
+#'
+#' @return character of length one, an endpoint URL without query string.
+#' @keywords internal
+wfs_endpoint <- function(service, host = "https://gdi.berlin.de/services/wfs") {
+  if (grepl("^https?://", service)) {
+    sub("/+$", "", sub("[?#].*$", "", service))
+  } else {
+    wfs_base_url(service, host = host)
+  }
 }
 
 #' Percent-encode a query parameter value
@@ -98,8 +134,7 @@ list_wfs_layers <- function(
 ) {
   version <- match.arg(version)
 
-  base_url <- if (grepl("^https?://", service)) service else
-    wfs_base_url(service, host = host)
+  base_url <- wfs_endpoint(service, host = host)
 
   url <- compose_ogc_url(
     base_url,
@@ -201,8 +236,7 @@ read_wfs <- function(
 
   version <- match.arg(version)
 
-  base_url <- if (grepl("^https?://", service)) service else
-    wfs_base_url(service, host = host)
+  base_url <- wfs_endpoint(service, host = host)
 
   # A bare service name is the namespace prefix of its own feature types.
   prefix <- sub("^.*/", "", base_url)

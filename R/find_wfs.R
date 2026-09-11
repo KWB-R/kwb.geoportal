@@ -40,7 +40,10 @@ wfs_service_name <- function(url) {
 #'   `base_url`.
 #'
 #' @return tibble with columns `title`, `service`, `link_url`, `link_desc`,
-#'   `link_protocol`, `geonet_uuid`, sorted by title.
+#'   `link_protocol`, `geonet_uuid`, sorted by title. Warns, and returns no
+#'   rows, when `metadata` holds no links at all or none of them uses
+#'   `protocol` -- both of which are a different thing from `pattern` not
+#'   matching. The second warning names the protocols that are on offer.
 #' @export
 #' @importFrom purrr map_dfr
 #' @importFrom tibble tibble as_tibble
@@ -85,9 +88,39 @@ find_wfs <- function(
     return(empty_wfs_result())
   }
 
+  # Without this, a catalogue whose records carry no online resources at all is
+  # indistinguishable from a pattern that simply does not match: both come back
+  # as a zero-row tibble.
+  if (!any(!is.na(flat$link_url) & nzchar(flat$link_url))) {
+    warning(sprintf(
+      paste0(
+        "None of the %d catalogue records carries a link, so there is nothing ",
+        "to search. The response of the 'base_url' passed to ",
+        "read_metadata_all() contains no <link> elements."
+      ),
+      nrow(metadata)
+    ), call. = FALSE)
+    return(empty_wfs_result())
+  }
+
+  # The links exist but none of them uses `protocol`: naming the protocols that
+  # are actually on offer answers the question, where a zero-row tibble only
+  # repeats it.
+  flat$link_protocol <- gn_link_protocol(flat$link_url, flat$link_protocol)
+
   if (!is.null(protocol)) {
     keep <- !is.na(flat$link_protocol) &
       grepl(protocol, flat$link_protocol, fixed = TRUE)
+
+    if (!any(keep)) {
+      warning(sprintf(
+        "No link uses the protocol '%s'. The catalogue offers: %s. Pass one of these as 'protocol', or NULL for all of them.",
+        protocol,
+        describe_protocols(flat$link_protocol)
+      ), call. = FALSE)
+      return(empty_wfs_result())
+    }
+
     flat <- flat[keep, , drop = FALSE]
   }
 
@@ -133,4 +166,87 @@ empty_wfs_result <- function() {
     link_protocol = character(0),
     geonet_uuid   = character(0)
   )
+}
+
+
+#' Summarise the link protocols present in a catalogue
+#'
+#' @param x character vector of `link_protocol` values, `NA`s allowed.
+#' @param max_shown number of protocols to name before summarising the rest.
+#'
+#' @return character of length one, e.g. `"INSPIRE ATOM (826), OGC:WMS (776)"`.
+#' @keywords internal
+describe_protocols <- function(x, max_shown = 10L) {
+  x <- x[!is.na(x) & nzchar(x)]
+
+  if (length(x) == 0L) {
+    return("no protocol at all")
+  }
+
+  counts <- sort(table(x), decreasing = TRUE)
+  shown <- counts[seq_len(min(length(counts), max_shown))]
+
+  described <- paste0(
+    names(shown), " (", as.integer(shown), ")",
+    collapse = ", "
+  )
+
+  if (length(counts) > length(shown)) {
+    described <- paste0(
+      described, " and ", length(counts) - length(shown), " more"
+    )
+  }
+
+  described
+}
+
+#' Protocol of a link, taken from its URL where the catalogue is unusable
+#'
+#' A GeoNetwork link declares its protocol in its own field, but the GDI Berlin
+#' records do not fill it in: their WMS and WFS links repeat the description
+#' there, so `link_protocol` reads
+#' `"Darstellungsdienst - ALKIS Berlin (WMS)"` where `"OGC:WMS"` is meant, and
+#' their viewer links leave it empty. Filtering on the declared value therefore
+#' drops every OGC service in the catalogue.
+#'
+#' The endpoint URL carries the same information and is machine-readable: the
+#' Berlin services answer under `/services/<type>/<name>` and name the type
+#' again in a `service=` query parameter. Where the URL says what the service
+#' is, it wins; otherwise the declared protocol is kept as it is, so a
+#' catalogue that fills the field in properly is unaffected.
+#'
+#' @param url link URL, `NA` allowed.
+#' @param protocol declared protocol, used where the URL says nothing.
+#'
+#' @return character vector, as long as `url`.
+#' @keywords internal
+#' @examples
+#' kwb.geoportal:::gn_link_protocol(
+#'   "https://gdi.berlin.de/services/wfs/kanal?service=WFS",
+#'   "Downloaddienst - Kanalisation (WFS)"
+#' )
+gn_link_protocol <- function(url, protocol = NA_character_) {
+  url <- as.character(url)
+  protocol <- rep_len(as.character(protocol), length(url))
+
+  known <- c(
+    WFS = "OGC:WFS",
+    WMS = "OGC:WMS",
+    WMTS = "OGC:WMTS",
+    WCS = "OGC:WCS",
+    CSW = "OGC:CSW"
+  )
+
+  derived <- rep(NA_character_, length(url))
+
+  # WMTS before WMS: the shorter name is a prefix of the longer one.
+  for (type in names(known)[order(nchar(names(known)), decreasing = TRUE)]) {
+    says_so <- !is.na(url) & is.na(derived) & (
+      grepl(paste0("[?&]service=", type, "([&#]|$)"), url, ignore.case = TRUE) |
+        grepl(paste0("/services/", type, "/"), url, ignore.case = TRUE)
+    )
+    derived[says_so] <- known[[type]]
+  }
+
+  ifelse(is.na(derived), protocol, derived)
 }

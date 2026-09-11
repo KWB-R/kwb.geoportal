@@ -17,21 +17,18 @@
 
 #' Parse a single GeoNetwork link element
 #'
-#' GeoNetwork often encodes links as a single string separated by `|`, e.g.:
+#' GeoNetwork encodes links as a single string separated by `|`, e.g.:
 #' `|Darstellungsdienst (WMS)|https://...|OGC:WMS|||`.
-#' This helper splits such a string into named columns and pads missing parts
-#' up to 6 elements.
+#' This helper splits such a string into named columns.
 #'
-#' The order used here is:
-#' 1. link name
-#' 2. link description
-#' 3. link URL
-#' 4. link protocol (e.g. `"OGC:WMS"`)
-#' 5. MIME type
-#' 6. order
+#' The fields are ordered name, description, URL, protocol, MIME type, order.
+#' The URL is the one field that can be recognised on its own, so it is located
+#' first and the remaining fields are read relative to it; that keeps the
+#' columns aligned for a catalogue that pads the record differently.
 #'
-#' Note: In many Berlin GDI records the **first** field (link name) is empty,
-#' and the actual meaningful text is in the **second** field (description).
+#' Note that a parsed `link_protocol` is only as good as the catalogue: the GDI
+#' Berlin records repeat the description there instead of naming a protocol,
+#' so filtering on it needs [gn_link_protocol()].
 #'
 #' @param x Character string as found inside a `<link>` XML node.
 #'
@@ -54,20 +51,50 @@ parse_gn_link <- function(x) {
   if (is.null(x) || length(x) == 0) {
     x <- ""
   }
+
   parts <- strsplit(x, "\\|")[[1]]
-  # pad / trim to 6 elements
-  if (length(parts) < 6) {
-    parts <- c(parts, rep(NA_character_, 6 - length(parts)))
-  } else if (length(parts) > 6) {
-    parts <- parts[1:6]
+
+  # Only fields that exist and carry something are worth reporting; everything
+  # else is missing rather than empty.
+  field <- function(i) {
+    if (i >= 1L && i <= length(parts) && nzchar(parts[i])) {
+      parts[i]
+    } else {
+      NA_character_
+    }
   }
+
+  at <- which(grepl("^[A-Za-z][A-Za-z0-9+.-]*://", parts))
+
+  if (length(at) == 0L) {
+    return(empty_gn_link())
+  }
+
+  at <- at[1L]
+
   tibble::tibble(
-    link_name     = parts[1],
-    link_desc     = parts[2],
-    link_url      = parts[3],
-    link_protocol = parts[4],
-    link_mime     = parts[5],
-    link_order    = parts[6]
+    link_name     = field(at - 2L),
+    link_desc     = field(at - 1L),
+    link_url      = parts[at],
+    link_protocol = field(at + 1L),
+    link_mime     = field(at + 2L),
+    link_order    = field(at + 3L)
+  )
+}
+
+#' One all-missing link row
+#'
+#' @return one-row tibble with the columns of [parse_gn_link()], all `NA`.
+#' @keywords internal
+#' @importFrom tibble tibble
+empty_gn_link <- function() {
+  tibble::tibble(
+    link_name     = NA_character_,
+    link_desc     = NA_character_,
+    link_url      = NA_character_,
+    link_protocol = NA_character_,
+    link_mime     = NA_character_,
+    link_order    = NA_character_
   )
 }
 
@@ -142,14 +169,7 @@ read_metadata <- function(path_xml) {
     link_nodes <- xml2::xml_find_all(md, ".//link")
 
     links_tbl <- if (length(link_nodes) == 0) {
-      list(tibble::tibble(
-        link_name     = NA_character_,
-        link_desc     = NA_character_,
-        link_url      = NA_character_,
-        link_protocol = NA_character_,
-        link_mime     = NA_character_,
-        link_order    = NA_character_
-      ))
+      list(empty_gn_link())
     } else {
       list(purrr::map_dfr(link_nodes, ~parse_gn_link(xml2::xml_text(.x))))
     }

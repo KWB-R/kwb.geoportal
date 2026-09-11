@@ -21,24 +21,19 @@ A one-row tibble with columns:
 }
 }
 \description{
-GeoNetwork often encodes links as a single string separated by \code{|}, e.g.:
+GeoNetwork encodes links as a single string separated by \code{|}, e.g.:
 \verb{|Darstellungsdienst (WMS)|https://...|OGC:WMS|||}.
-This helper splits such a string into named columns and pads missing parts
-up to 6 elements.
+This helper splits such a string into named columns.
 }
 \details{
-The order used here is:
-\enumerate{
-\item link name
-\item link description
-\item link URL
-\item link protocol (e.g. \code{"OGC:WMS"})
-\item MIME type
-\item order
-}
+The fields are ordered name, description, URL, protocol, MIME type, order.
+The URL is the one field that can be recognised on its own, so it is located
+first and the remaining fields are read relative to it; that keeps the
+columns aligned for a catalogue that pads the record differently.
 
-Note: In many Berlin GDI records the \strong{first} field (link name) is empty,
-and the actual meaningful text is in the \strong{second} field (description).
+Note that a parsed \code{link_protocol} is only as good as the catalogue: the GDI
+Berlin records repeat the description there instead of naming a protocol,
+so filtering on it needs \code{\link[=gn_link_protocol]{gn_link_protocol()}}.
 }
 \examples{
 parse_gn_link("|Darstellungsdienst (WMS)|https://example.org/wms?|OGC:WMS|||")

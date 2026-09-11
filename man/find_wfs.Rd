@@ -23,7 +23,10 @@ to search repeatedly without downloading the catalogue again. If \code{NULL}
 }
 \value{
 tibble with columns \code{title}, \code{service}, \code{link_url}, \code{link_desc},
-\code{link_protocol}, \code{geonet_uuid}, sorted by title.
+\code{link_protocol}, \code{geonet_uuid}, sorted by title. Warns, and returns no
+rows, when \code{metadata} holds no links at all or none of them uses
+\code{protocol} -- both of which are a different thing from \code{pattern} not
+matching. The second warning names the protocols that are on offer.
 }
 \description{
 Searches the GeoNetwork catalogue read by \code{\link[=read_metadata_all]{read_metadata_all()}} for records
